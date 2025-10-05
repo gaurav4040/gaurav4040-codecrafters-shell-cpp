@@ -65,7 +65,7 @@
     pid_t pid= fork();
     if(pid<0){
       perror("fork failed");
-      return;
+      return false;
     }
     if(pid==0){
       execv(exe_path.c_str(),argv.data());
@@ -77,7 +77,7 @@
         perror("waitpid failed");
       }
     }
-    
+    return true;
   }
 
   void handleType(std::string &remaining){
