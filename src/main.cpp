@@ -3,6 +3,10 @@
   #include <string>
   #include <filesystem>
   #include <cstdlib>
+  #include <vector>
+  #include <unistd.h>
+  #include <sys/wait.h>
+  
   namespace fs=std::filesystem;
 
 
@@ -69,7 +73,7 @@
       }else{
         int status= 0;
         if(waitpid(pid,&status,0)<0){
-          perror("waitpid failed")
+          perror("waitpid failed");
         }
       }
     }
@@ -124,7 +128,7 @@
       }
       if(word=="echo"){
         if(!remaining.empty()&&remaining[0]==' '){
-          remaining.erase(0,remaining.find_first_not_of(' \t'));
+          remaining.erase(0,remaining.find_first_not_of(" \t"));
           std::cout<<remaining<<std::endl;
         }
         continue;
