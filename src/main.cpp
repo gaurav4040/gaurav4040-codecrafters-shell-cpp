@@ -6,34 +6,35 @@
   namespace fs=std::filesystem;
 
 
-  fs::path find_executable_in_path(std::string &word2){
-    const char* path_env = std::getenv("PATH");
-    if(!path_env)return {};
+    fs::path find_executable_in_path(std::string &word2){
+      const char* path_env = std::getenv("PATH");
+      if(!path_env)return {};
 
-    std::istringstream path_stream(path_env);
-    std::string dir;
+      std::istringstream path_stream(path_env);
+      std::string dir;
 
-    #ifdef _WIN32
-      const char delimeter = ';';
-    #else 
-      const char delimeter = ':';
-    #endif
-      while (std::getline(path_stream,dir,delimeter)){
-        if(!fs::exists(dir))continue;
-        fs::path candidate = fs::path(dir)/word2;
-        if(fs::exists(candidate)&&fs::is_regular_file(candidate)&&(fs::status(candidate).permissions()&fs::perms::owner_exec)!=fs::perms::none){
-          return fs::canonical(candidate);
+      #ifdef _WIN32
+        const char delimeter = ';';
+      #else 
+        const char delimeter = ':';
+      #endif
+        fs::path candidate;
+        while (std::getline(path_stream,dir,delimeter)){
+          if(!fs::exists(dir))continue;
+          candidate = fs::path(dir)/word2;
+          if(fs::exists(candidate)&&fs::is_regular_file(candidate)&&(fs::status(candidate).permissions()&fs::perms::owner_exec)!=fs::perms::none){
+            return fs::canonical(candidate);
+          }
         }
-      }
-    #ifdef _WIN32
-      fs::path exe_candidate = candidate;
-      exe_candidate +=".exe";
-      if(fs::exists(exe_candidate)&&fs::is_regular_file(exe_candidate)){
-        return fs::canonical(exe_candidate);
-      }
-    #endif
-      return {};
-  }
+      #ifdef _WIN32
+        fs::path exe_candidate = candidate;
+        exe_candidate +=".exe";
+        if(fs::exists(exe_candidate)&&fs::is_regular_file(exe_candidate)){
+          return fs::canonical(exe_candidate);
+        }
+      #endif
+        return {};
+    }
 
   void handleType(std::string &remaining){
     std::string word2;
