@@ -6,7 +6,7 @@
   #include <vector>
   #include <unistd.h>
   #include <sys/wait.h>
-  
+
   namespace fs=std::filesystem;
 
 
@@ -40,43 +40,44 @@
       return {};
   }
 
-  void handleExe(std::string &input){
+  bool handleExe(std::string &input){
     std::vector<std::string>parts;
     {
       std::istringstream ps(input);
       std::string tok;
       while(ps>>tok)parts.push_back(tok);
     }
-    if(!parts.empty()){
-      std::string progname = parts[0];
-      fs::path exe_path = find_executable_in_path(progname);
+    if(parts.empty())return false;
 
-      if(exe_path.empty()){
-        return;
-      }
+    std::string progname = parts[0];
+    fs::path exe_path = find_executable_in_path(progname);
 
-      std::vector<char*>argv;
-      for(size_t i=0;i<parts.size();++i){
-        argv.push_back(const_cast<char*>(parts[i].c_str()));
-      }
-      argv.push_back(nullptr);
-      
-      pid_t pid= fork();
-      if(pid<0){
-        perror("fork failed");
-        return;
-      }
-      if(pid==0){
-        execv(exe_path.c_str(),argv.data());
-        perror("execv failed");
-        _exit(127);
-      }else{
-        int status= 0;
-        if(waitpid(pid,&status,0)<0){
-          perror("waitpid failed");
-        }
+    if(exe_path.empty()){
+      return false; 
+    }
+
+    std::vector<char*>argv;
+    for(size_t i=0;i<parts.size();++i){
+      argv.push_back(const_cast<char*>(parts[i].c_str()));
+    }
+    argv.push_back(nullptr);
+    
+    pid_t pid= fork();
+    if(pid<0){
+      perror("fork failed");
+      return;
+    }
+    if(pid==0){
+      execv(exe_path.c_str(),argv.data());
+      perror("execv failed");
+      _exit(127);
+    }else{
+      int status= 0;
+      if(waitpid(pid,&status,0)<0){
+        perror("waitpid failed");
       }
     }
+    
   }
 
   void handleType(std::string &remaining){
@@ -111,7 +112,7 @@
       std::getline(std::cin, input);
       
       size_t first_non = input.find_first_not_of(" \t\t\n");
-      if(first_non=std::string::npos)continue;
+      if(first_non==std::string::npos)continue;
       if(first_non>0)input.erase(0,first_non);
       
       
@@ -139,9 +140,10 @@
         continue;
       }
 
-      handleExe(input);
+      if(!handleExe(input)){
+        std::cout << input << ": command not found" << std::endl;
+      }
 
-      std::cout << input << ": command not found" << std::endl;
     }
 
     return 0;
