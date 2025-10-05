@@ -3,7 +3,7 @@
 #include <string>
 #include <filesystem>
 #include <cstdlib>
-namespace fs=std::filesystem
+namespace fs=std::filesystem;
 
 
 fs::path find_executable_in_path(std::string &word2){
