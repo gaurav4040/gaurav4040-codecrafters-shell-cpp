@@ -6,35 +6,74 @@
   namespace fs=std::filesystem;
 
 
-    fs::path find_executable_in_path(std::string &word2){
-      const char* path_env = std::getenv("PATH");
-      if(!path_env)return {};
+  fs::path find_executable_in_path(std::string &word2){
+    const char* path_env = std::getenv("PATH");
+    if(!path_env)return {};
 
-      std::istringstream path_stream(path_env);
-      std::string dir;
+    std::istringstream path_stream(path_env);
+    std::string dir;
 
-      #ifdef _WIN32
-        const char delimeter = ';';
-      #else 
-        const char delimeter = ':';
-      #endif
-        fs::path candidate;
-        while (std::getline(path_stream,dir,delimeter)){
-          if(!fs::exists(dir))continue;
-          candidate = fs::path(dir)/word2;
-          if(fs::exists(candidate)&&fs::is_regular_file(candidate)&&(fs::status(candidate).permissions()&fs::perms::owner_exec)!=fs::perms::none){
-            return fs::canonical(candidate);
-          }
+    #ifdef _WIN32
+      const char delimeter = ';';
+    #else 
+      const char delimeter = ':';
+    #endif
+      fs::path candidate;
+      while (std::getline(path_stream,dir,delimeter)){
+        if(!fs::exists(dir))continue;
+        candidate = fs::path(dir)/word2;
+        if(fs::exists(candidate)&&fs::is_regular_file(candidate)&&(fs::status(candidate).permissions()&fs::perms::owner_exec)!=fs::perms::none){
+          return fs::canonical(candidate);
         }
-      #ifdef _WIN32
-        fs::path exe_candidate = candidate;
-        exe_candidate +=".exe";
-        if(fs::exists(exe_candidate)&&fs::is_regular_file(exe_candidate)){
-          return fs::canonical(exe_candidate);
-        }
-      #endif
-        return {};
+      }
+    #ifdef _WIN32
+      fs::path exe_candidate = candidate;
+      exe_candidate +=".exe";
+      if(fs::exists(exe_candidate)&&fs::is_regular_file(exe_candidate)){
+        return fs::canonical(exe_candidate);
+      }
+    #endif
+      return {};
+  }
+
+  void handleExe(std::string &input){
+    std::vector<std::string>parts;
+    {
+      std::istringstream ps(input);
+      std::string tok;
+      while(ps>>tok)parts.push_back(tok);
     }
+    if(!parts.empty()){
+      std::string progname = parts[0];
+      fs::path exe_path = find_executable_in_path(progname);
+
+      if(exe_path.empty()){
+        return;
+      }
+
+      std::vector<char*>argv;
+      for(size_t i=0;i<parts.size();++i){
+        argv.push_back(const_cast<char*>(parts[i].c_str()));
+      }
+      argv.push_back(nullptr);
+      
+      pid_t pid= fork();
+      if(pid<0){
+        perror("fork failed");
+        return;
+      }
+      if(pid==0){
+        execv(exe_path.c_str(),argv.data());
+        perror("execv failed");
+        _exit(127);
+      }else{
+        int status= 0;
+        if(waitpid(pid,&status,0)<0){
+          perror("waitpid failed")
+        }
+      }
+    }
+  }
 
   void handleType(std::string &remaining){
     std::string word2;
@@ -61,23 +100,31 @@
     // Flush after every std::cout / std:cerr
     std::cout << std::unitbuf;
     std::cerr << std::unitbuf;
-
+ 
     while(true){
       std::cout<<"$ ";
       std::string input;
-      std::string word;
-      std::string remaining;
       std::getline(std::cin, input);
+      
+      size_t first_non = input.find_first_not_of(" \t\t\n");
+      if(first_non=std::string::npos)continue;
+      if(first_non>0)input.erase(0,first_non);
+      
+      
       std::istringstream iss(input);
+      std::string word;
       iss>>word;
+
+      std::string remaining;
       std::getline(iss,remaining);
+
 
       if(input=="exit 0"){
         break;
       }
       if(word=="echo"){
         if(!remaining.empty()&&remaining[0]==' '){
-          remaining.erase(0,remaining.find_first_not_of(' '));
+          remaining.erase(0,remaining.find_first_not_of(' \t'));
           std::cout<<remaining<<std::endl;
         }
         continue;
@@ -87,6 +134,8 @@
         handleType(remaining);
         continue;
       }
+
+      handleExe(input);
 
       std::cout << input << ": command not found" << std::endl;
     }
