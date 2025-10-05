@@ -1,6 +1,60 @@
 #include <iostream>
 #include <sstream>
 #include <string>
+#include <filesystem>
+#include <cstdlib>
+namespace fs=std::filesystem
+
+
+fs::path find_executable_in_path(std::string &word2){
+  const char* path_env = std::getenv("PATH");
+  if(!path_env)return {};
+
+  std::istringstream path_stream(path_env);
+  std::string dir;
+
+  #ifdef _WIN32
+    const char delimeter = ';';
+  #else 
+    const char delimeter = ':';
+  #endif
+    while (std::getline(path_stream,dir,delimeter)){
+      if(!fs::exists(dir))continue;
+      fs::path candidate = fs::path(dir)/word2;
+      if(fs::exists(candidate)&&fs::is_regular_file(candidate)&&(fs::status(candidate).permissions()&fs::perms::owner_exec)!=fs::perms::none){
+        return fs::canonical(candidate);
+      }
+    }
+  #ifdef _WIN32
+    fs::path exe_candidate = candidate;
+    exe_candidate +=".exe";
+    if(fs::exists(exe_candidate)&&fs::is_regular_file(exe_candidate)){
+      return fs::canonical(exe_candidate);
+    }
+  #endif
+    return {};
+}
+
+void handleType(std::string &remaining){
+  std::string word2;
+  std::string remainingType;
+  std::istringstream ist(remaining);
+  ist>>word2;
+  std::getline(ist,remainingType);
+
+  if((word2=="type"||word2=="echo"||word2=="exit")&&(remainingType.empty()||remainingType.find_first_not_of(" \t\n\r")==std::string::npos)){
+    std::cout<< word2 << " is a shell builtin"<<std::endl;
+  }else{
+
+    fs::path exec_path = find_executable_in_path(word2);
+    if(!exec_path.empty()){
+      std::cout<< word2 << " is " << exec_path << std::endl;
+    }
+    else{
+      std::cout<< word2 << ": not found"<<std::endl;
+    }
+  }
+}
 
 int main() {
   // Flush after every std::cout / std:cerr
@@ -29,16 +83,7 @@ int main() {
     }
 
     if(word=="type"){
-      std::string word2;
-      std::string remainingType;
-      std::istringstream ist(remaining);
-      ist>>word2;
-      std::getline(ist,remainingType);
-      if((word2=="type"||word2=="echo"||word2=="exit")&&(remainingType.empty()||remainingType.find_first_not_of(" \t\n\r")==std::string::npos)){
-        std::cout<< word2 << " is a shell builtin"<<std::endl;
-      }else{
-        std::cout<< word2 << ": not found"<<std::endl;
-      }
+      handleType(remaining);
       continue;
     }
 
